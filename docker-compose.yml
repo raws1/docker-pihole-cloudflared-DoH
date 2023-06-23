@@ -1,0 +1,45 @@
+version: "3"
+
+services:
+  cloudflared:
+    container_name: cloudflared
+    restart: unless-stopped
+    image: cloudflare/cloudflared
+    command: proxy-dns
+    environment:
+      - "TUNNEL_DNS_UPSTREAM=https://1.1.1.1/dns-query,https://1.0.0.1/dns-query"
+      - "TUNNEL_DNS_PORT=5053"
+      - "TUNNEL_DNS_ADDRESS=0.0.0.0"
+    networks:
+      pihole_net:
+        ipv4_address: 172.16.254.3
+
+  pihole:
+    container_name: pihole
+    hostname: pihole
+    image: pihole/pihole:latest
+    ports:
+      - "$HOSTIP:53:53/tcp"
+      - "$HOSTIP:53:53/udp"
+      - "$HOSTIP:80:80/tcp"
+    environment:
+      TZ: 'America/New_York'
+      WEBPASSWORD: '$PASSWORD'
+      DNS1: '172.16.254.3#5053'
+      DNS2: 'no'
+      DNSMASQ_LISTENING: 'all'
+    volumes:
+      - './etc-pihole:/etc/pihole'
+      - './etc-dnsmasq.d:/etc/dnsmasq.d'
+    restart: unless-stopped
+    networks:
+      pihole_net:
+        ipv4_address: 172.16.254.2
+    depends_on:
+      - cloudflared
+
+networks:
+  pihole_net:
+    ipam:
+      config:
+        - subnet: 172.16.254.0/28
